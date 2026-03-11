@@ -1,11 +1,10 @@
 #Setting up environment
-require(ggplot2)
 require(dplyr)
 require(rebird)
 require(geosphere)
 require(pbapply)
 
-#setwd('path')
+setwd('/Users/lnash1/Documents/Birds of Norfolk')
 rm = list(ls())
 
 #Group all hotspots by site and get aggregated co-ordinates
@@ -17,7 +16,7 @@ locsAll <- ebirdhotspotlist("GB-ENG-NFK") |>
   #hotspots by site is done by removing strings after -- or (; where distant 
   #sites share names, this is handled in nonDupe.
   mutate(nonDupe = duplicated(locName) | duplicated(locName, fromLast = T),
-         siteName = trimws(sub("--.*|\\(.*","",locName))) |>
+         siteName = trimws(gsub("--.*|\\(.*","",locName))) |>
   
   #Removing historical stakeouts
   filter(!grepl("stakeout|Stakeout",siteName)) |>
@@ -64,6 +63,9 @@ spAll <- ebirdregion("GB-ENG-NFK", provisional = T, back=30) |>
 
 #Compute data frame of most recent observations of all species across all sites
 #in Norfolk.
+
+temp <- ebirdregion("GB-ENG-NFK", spAll[1], provisional = T, back=30)
+
 obsAll <- pblapply(spAll, function(sp){
   ebirdregion("GB-ENG-NFK",sp, provisional = T, back=30) |>
     
@@ -77,10 +79,10 @@ obsAll <- pblapply(spAll, function(sp){
     rowwise() |>
     mutate(siteName = ifelse(
       locId %in% locsAll$locId,
-      locsAll$locName[match(locId, locsAll$locId)],
+      locsAll$siteName[match(locId, locsAll$locId)],
       ifelse(
         min(distHaversine(c(lng, lat), cbind(locsAll$locLng, locsAll$locLat))) <= 2000,
-        locsAll$locName[which.min(distHaversine(c(lng, lat), cbind(locsAll$locLng, locsAll$locLat)))],
+        locsAll$siteName[which.min(distHaversine(c(lng, lat), cbind(locsAll$locLng, locsAll$locLat)))],
         NA_character_
       )
     )) |>
