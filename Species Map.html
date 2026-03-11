@@ -1,0 +1,842 @@
+<!--
+╔═══════════════════════════════════════════════════════════════════╗
+║  NORFOLK SPECIES OBSERVATION MAP                                  ║
+║  WordPress-embeddable widget                                      ║
+║                                                                   ║
+║  DEPLOY ON WORDPRESS:                                             ║
+║  • Gutenberg "Custom HTML" block  — paste entire file contents    ║
+║  • WPCode / Insert Headers & Footers plugin — paste in footer     ║
+║  • <iframe src="hosted-file-url" width="100%" height="660">       ║
+║                                                                   ║
+║  DATA SOURCE:                                                     ║
+║  Set CSV_URL below to the public URL of your hosted CSV file.     ║
+║  The CSV will be fetched fresh on every page load.                ║
+║                                                                   ║
+║  REQUIRED CSV COLUMNS (names are flexible / case-insensitive):   ║
+║    common_name   — or common, name                                ║
+║    scientific_name — or scientific, latin                         ║
+║    site_name     — or site, location                              ║
+║    date          — or last_seen, observed_on  (any parseable fmt) ║
+║    latitude      — or lat                                         ║
+║    longitude     — or lon, lng, long                              ║
+║    validity      — or valid, confirmed  (TRUE / FALSE)            ║
+╚═══════════════════════════════════════════════════════════════════╝
+-->
+
+<!-- ── External resources ─────────────────────────────────────── -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400;1,600&family=Nunito+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+
+<!-- ══════════════════════════════════════════════════════════════
+     CONFIGURATION — edit this block only
+     ══════════════════════════════════════════════════════════════ -->
+<script>
+  // ▼ Point this at your hosted CSV URL
+  var CSV_URL = '';   // e.g. 'https://raw.githubusercontent.com/you/repo/main/data.csv'
+                      // Leave empty to use the built-in sample data below
+</script>
+<!-- ══════════════════════════════════════════════════════════════ -->
+
+<style>
+/* All rules scoped under #nsom to avoid WordPress theme bleed */
+#nsom, #nsom * { box-sizing: border-box; margin: 0; padding: 0; }
+
+#nsom {
+  --cream:      #f7f3ea;
+  --cream-d:    #ede7d6;
+  --parchment:  #faf8f3;
+  --green-dk:   #2e4f2e;
+  --green-md:   #4a7c4a;
+  --green-lt:   #6ea86e;
+  --green-faint:#eef4ee;
+  --orange:     #c8692a;
+  --orange-lt:  #f0e4d8;
+  --border:     #c8bb9e;
+  --border-lt:  #ddd5be;
+  --text:       #2a2218;
+  --text-md:    #5a4e38;
+  --text-lt:    #8a7a5e;
+  --shadow:     rgba(30,24,14,0.14);
+  --r:          5px;
+
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 13.5px;
+  color: var(--text);
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 3px 22px var(--shadow);
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+#nsom .n-hd {
+  background: var(--green-dk);
+  background-image: linear-gradient(135deg, #2e4f2e 0%, #3a6338 60%, #2e4f2e 100%);
+  padding: 13px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-bottom: 3px solid var(--orange);
+}
+
+#nsom .n-title {
+  font-family: 'Crimson Pro', serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--cream);
+  letter-spacing: 0.02em;
+}
+
+#nsom .n-title span {
+  font-style: italic;
+  font-weight: 400;
+  color: #b8d4a8;
+  font-size: 0.9em;
+}
+
+#nsom .n-ticker {
+  font-size: 0.7rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #a8c898;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+
+#nsom .n-ticker strong {
+  color: #d4eebc;
+  font-weight: 600;
+}
+
+/* ── Search bar strip ───────────────────────────────────────── */
+#nsom .n-searchbar {
+  background: var(--cream-d);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+
+#nsom .n-searchbar label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-lt);
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+#nsom .n-search-wrap {
+  position: relative;
+  flex: 1;
+  max-width: 480px;
+}
+
+#nsom .n-search {
+  width: 100%;
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 7px 12px 7px 34px;
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 0.82rem;
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+#nsom .n-search:focus {
+  border-color: var(--green-md);
+  box-shadow: 0 0 0 3px rgba(74,124,74,0.12);
+}
+
+#nsom .n-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-lt);
+  pointer-events: none;
+}
+
+#nsom .n-clear-btn {
+  display: none;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-lt);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+#nsom .n-clear-btn:hover { color: var(--text); }
+
+#nsom .n-hint {
+  font-size: 0.7rem;
+  color: var(--text-lt);
+  font-style: italic;
+  margin-left: 4px;
+}
+
+/* ── Autocomplete dropdown ──────────────────────────────────── */
+#nsom .n-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: 0 6px 24px var(--shadow);
+  z-index: 9999;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+#nsom .n-dropdown::-webkit-scrollbar { width: 5px; }
+#nsom .n-dropdown::-webkit-scrollbar-track { background: transparent; }
+#nsom .n-dropdown::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+#nsom .n-dd-item {
+  padding: 9px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-lt);
+  transition: background .1s;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+#nsom .n-dd-item:last-child { border-bottom: none; }
+#nsom .n-dd-item:hover, #nsom .n-dd-item.focused { background: var(--green-faint); }
+
+#nsom .n-dd-common {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+#nsom .n-dd-sci {
+  font-family: 'Crimson Pro', serif;
+  font-style: italic;
+  font-size: 0.82rem;
+  color: var(--text-lt);
+}
+
+#nsom mark {
+  background: #d4eebc;
+  color: var(--green-dk);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+#nsom .n-dd-none {
+  padding: 12px 14px;
+  font-size: 0.8rem;
+  color: var(--text-lt);
+  font-style: italic;
+}
+
+/* ── Body ───────────────────────────────────────────────────── */
+#nsom .n-body {
+  display: flex;
+  flex: 1;
+  min-height: 560px;
+  overflow: hidden;
+}
+
+/* ── Map ────────────────────────────────────────────────────── */
+#nsom-map {
+  flex: 1;
+  min-height: 560px;
+  min-width: 0;
+  z-index: 1;
+}
+
+/* ── Legend strip ───────────────────────────────────────────── */
+#nsom .n-legend {
+  background: var(--cream-d);
+  border-top: 1px solid var(--border);
+  padding: 7px 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-lt);
+  font-weight: 600;
+  flex-wrap: wrap;
+}
+
+#nsom .n-leg-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#nsom .n-leg-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,0,0,0.15);
+  flex-shrink: 0;
+}
+
+/* ── Popup overrides ────────────────────────────────────────── */
+#nsom .leaflet-popup-content-wrapper {
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--green-md);
+  border-radius: var(--r);
+  box-shadow: 0 5px 22px var(--shadow);
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  padding: 0;
+}
+
+#nsom .leaflet-popup-content {
+  margin: 0;
+  width: auto !important;
+}
+
+#nsom .leaflet-popup-tip-container { margin-top: -1px; }
+#nsom .leaflet-popup-tip { background: var(--parchment); }
+#nsom .leaflet-popup-close-button { color: var(--text-lt) !important; top: 8px !important; right: 8px !important; }
+
+#nsom .n-popup {
+  min-width: 200px;
+  max-width: 260px;
+}
+
+#nsom .n-popup-site {
+  background: var(--green-dk);
+  color: var(--cream);
+  font-family: 'Crimson Pro', serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 10px 14px;
+  letter-spacing: 0.01em;
+  border-radius: 3px 3px 0 0;
+}
+
+#nsom .n-popup-body {
+  padding: 10px 14px 12px;
+}
+
+#nsom .n-popup-common {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+#nsom .n-popup-sci {
+  font-family: 'Crimson Pro', serif;
+  font-style: italic;
+  font-size: 0.88rem;
+  color: var(--text-md);
+  margin-bottom: 10px;
+}
+
+#nsom .n-popup-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  font-size: 0.76rem;
+}
+
+#nsom .n-popup-key {
+  color: var(--text-lt);
+  font-size: 0.67rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  min-width: 64px;
+  font-weight: 600;
+}
+
+#nsom .n-popup-val { color: var(--text); }
+
+#nsom .n-popup-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+#nsom .n-popup-badge.confirmed {
+  background: #ddf0dd;
+  color: var(--green-dk);
+  border: 1px solid #a8d4a8;
+}
+
+#nsom .n-popup-badge.unconfirmed {
+  background: var(--orange-lt);
+  color: #8a3a10;
+  border: 1px solid #e0b090;
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 580px) {
+  #nsom-map { min-height: 360px; }
+  #nsom .n-hint { display: none; }
+}
+</style>
+
+<!-- ── Markup ─────────────────────────────────────────────────── -->
+<div id="nsom">
+
+  <!-- Header -->
+  <div class="n-hd">
+    <div class="n-title">Norfolk Species Observations <span>— interactive map</span></div>
+    <div class="n-ticker" id="n-ticker" style="display:none">
+      <strong id="n-ticker-count">0</strong> sites recording this species in the last 30 days
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="n-searchbar">
+    <label for="n-search-input">Find a species:</label>
+    <div class="n-search-wrap">
+      <svg class="n-search-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
+        <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.5"/>
+        <line x1="10.5" y1="10.5" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <input class="n-search" id="n-search-input" type="text"
+             placeholder="Common or scientific name…" autocomplete="off">
+      <button class="n-clear-btn" id="n-clear-btn" title="Clear">✕</button>
+      <div class="n-dropdown" id="n-dropdown"></div>
+    </div>
+    <span class="n-hint">Type to search — select a species to show its sites</span>
+  </div>
+
+  <!-- Map body -->
+  <div class="n-body">
+    <div id="nsom-map"></div>
+  </div>
+
+  <!-- Legend -->
+  <div class="n-legend">
+    <span style="margin-right:4px">Status:</span>
+    <span class="n-leg-item">
+      <span class="n-leg-dot" style="background:#2e7d32"></span> Confirmed
+    </span>
+    <span class="n-leg-item">
+      <span class="n-leg-dot" style="background:#c8692a"></span> Unconfirmed
+    </span>
+    <span style="margin-left:auto;font-size:.65rem;opacity:.6;text-transform:none;letter-spacing:0">
+      Data refreshed on page load · Search by common or scientific name
+    </span>
+  </div>
+
+</div>
+
+<!-- ── Scripts ────────────────────────────────────────────────── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ── SAMPLE DATA (used when CSV_URL is empty) ──────────────────
+     Replace with your real hosted CSV URL in the config block above.
+     Column names match the flexible parser below.
+  ─────────────────────────────────────────────────────────────── */
+  var SAMPLE_CSV = [
+    'common_name,scientific_name,site_name,date,latitude,longitude,validity',
+    'Marsh Harrier,Circus aeruginosus,Hickling Broad NNR,2025-02-28,52.7408,1.5678,TRUE',
+    'Marsh Harrier,Circus aeruginosus,Cley Marshes,2025-03-05,52.9571,1.0479,TRUE',
+    'Marsh Harrier,Circus aeruginosus,Titchwell Marsh,2025-03-01,52.9741,0.6013,TRUE',
+    'Bittern,Botaurus stellaris,Hickling Broad NNR,2025-03-08,52.7408,1.5678,TRUE',
+    'Bittern,Botaurus stellaris,Strumpshaw Fen,2025-02-20,52.6134,1.4437,TRUE',
+    'Bittern,Botaurus stellaris,Barton Broad,2025-01-15,52.7280,1.5210,FALSE',
+    'Avocet,Recurvirostra avosetta,Titchwell Marsh,2025-03-09,52.9741,0.6013,TRUE',
+    'Avocet,Recurvirostra avosetta,Cley Marshes,2025-03-07,52.9571,1.0479,TRUE',
+    'Avocet,Recurvirostra avosetta,Breydon Water,2025-02-10,52.6078,1.6801,TRUE',
+    'Pink-footed Goose,Anser brachyrhynchus,Holkham NNR,2025-03-04,52.9700,0.8200,TRUE',
+    'Pink-footed Goose,Anser brachyrhynchus,Ken Hill Marshes,2025-02-28,52.8700,0.5100,TRUE',
+    'Bearded Tit,Panurus biarmicus,Hickling Broad NNR,2025-03-06,52.7408,1.5678,TRUE',
+    'Bearded Tit,Panurus biarmicus,Cley Marshes,2025-02-22,52.9571,1.0479,TRUE',
+    'Common Crane,Grus grus,Hickling Broad NNR,2025-03-10,52.7408,1.5678,TRUE',
+    'Common Crane,Grus grus,Strumpshaw Fen,2025-02-18,52.6134,1.4437,FALSE',
+    'Barn Owl,Tyto alba,Welney WWT,2025-03-02,52.5120,0.2640,TRUE',
+    'Barn Owl,Tyto alba,Holkham NNR,2025-01-30,52.9700,0.8200,FALSE',
+    'Water Rail,Rallus aquaticus,Cley Marshes,2025-03-05,52.9571,1.0479,TRUE',
+    'Water Rail,Rallus aquaticus,Titchwell Marsh,2025-02-25,52.9741,0.6013,TRUE',
+    'Eurasian Spoonbill,Platalea leucorodia,Titchwell Marsh,2025-03-09,52.9741,0.6013,TRUE',
+    'Eurasian Spoonbill,Platalea leucorodia,Brancaster Staithe,2025-03-03,52.9620,0.6400,FALSE',
+    'Little Egret,Egretta garzetta,Breydon Water,2025-03-08,52.6078,1.6801,TRUE',
+    'Little Egret,Egretta garzetta,Cley Marshes,2025-03-01,52.9571,1.0479,TRUE',
+    'Swallowtail Butterfly,Papilio machaon britannicus,Hickling Broad NNR,2025-02-28,52.7408,1.5678,FALSE',
+    'Otter,Lutra lutra,Strumpshaw Fen,2025-03-06,52.6134,1.4437,TRUE',
+    'Otter,Lutra lutra,River Bure at Horning,2025-02-14,52.7200,1.4800,TRUE',
+    'Chinese Water Deer,Hydropotes inermis,Holkham NNR,2025-03-07,52.9700,0.8200,TRUE',
+    'Natterjack Toad,Epidalea calamita,Holkham NNR,2025-01-20,52.9700,0.8200,FALSE',
+    'Grey Seal,Halichoerus grypus,Blakeney Point,2025-03-09,52.9999,0.9741,TRUE',
+    'Grey Seal,Halichoerus grypus,Horsey Beach,2025-03-07,52.7500,1.6500,TRUE',
+  ].join('\n');
+
+  /* ── State ─────────────────────────────────────────────────── */
+  var allData      = [];
+  var speciesIndex = {};   // key: "common|||sci" → array of rows
+  var leafMap      = null;
+  var markerLayer  = null;
+  var activeSpecies = null;
+  var ddFocusIdx   = -1;
+  var ddItems      = [];
+
+  /* ── Init map (Norfolk centred) ────────────────────────────── */
+  function initMap() {
+    leafMap = L.map('nsom-map', { zoomControl: true })
+               .setView([52.78, 1.00], 9);
+
+    // OpenTopoMap — topographic tile layer
+    L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA) · © <a href="https://openstreetmap.org">OSM</a>',
+      maxZoom: 17
+    }).addTo(leafMap);
+
+    markerLayer = L.layerGroup().addTo(leafMap);
+  }
+
+  /* ── CSV parser ─────────────────────────────────────────────── */
+  function parseCSV(txt) {
+    var lines = txt.trim().split(/\r?\n/);
+    if (lines.length < 2) return [];
+
+    // Detect delimiter
+    var d = ',';
+    if (lines[0].indexOf('\t') > -1 && lines[0].indexOf(',') === -1) d = '\t';
+    else if (lines[0].indexOf(';') > -1 && lines[0].indexOf(',') === -1) d = ';';
+
+    var hdrs = splitLine(lines[0], d).map(function (h) { return h.toLowerCase().trim().replace(/['"]/g,''); });
+
+    function ci(aliases) {
+      for (var i = 0; i < aliases.length; i++) {
+        var x = hdrs.indexOf(aliases[i]);
+        if (x > -1) return x;
+      }
+      return -1;
+    }
+
+    var cni  = ci(['common_name','common','name']);
+    var sci  = ci(['scientific_name','scientific','latin','sci_name']);
+    var sni  = ci(['site_name','site','location','place']);
+    var di   = ci(['date','last_seen','observed_on','obs_date']);
+    var lati = ci(['latitude','lat']);
+    var loni = ci(['longitude','lon','lng','long']);
+    var vi   = ci(['validity','valid','confirmed','status']);
+
+    var rows = [];
+    for (var i = 1; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line) continue;
+      var c = splitLine(line, d);
+      var lat = parseFloat(c[lati]);
+      var lon = parseFloat(c[loni]);
+      if (isNaN(lat) || isNaN(lon)) continue;
+      var commonName = clean(c[cni]);
+      var sciName    = clean(c[sci]);
+      if (!commonName && !sciName) continue;
+      var rawDate    = di > -1 ? clean(c[di]) : '';
+      rows.push({
+        common:   commonName,
+        sci:      sciName,
+        site:     sni  > -1 ? clean(c[sni]) : '',
+        date:     formatDate(rawDate),
+        lat:      lat,
+        lon:      lon,
+        valid:    vi > -1 ? /^(true|yes|1|confirmed)$/i.test(clean(c[vi])) : true
+      });
+    }
+    return rows;
+  }
+
+  function clean(v) {
+    if (v === undefined || v === null) return '';
+    return String(v).trim().replace(/^["']|["']$/g, '');
+  }
+
+  function splitLine(line, d) {
+    var r = [], cur = '', q = false;
+    for (var i = 0; i < line.length; i++) {
+      var ch = line[i];
+      if (ch === '"') { q = !q; }
+      else if (ch === d && !q) { r.push(cur); cur = ''; }
+      else { cur += ch; }
+    }
+    r.push(cur);
+    return r;
+  }
+
+  /* ── Date formatter → DD/MM/YYYY ───────────────────────────── */
+  function formatDate(str) {
+    if (!str) return '';
+    // Try parsing various formats
+    var d = new Date(str);
+    // Also handle DD/MM/YYYY input explicitly
+    var dmyMatch = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+    if (dmyMatch) {
+      var day = parseInt(dmyMatch[1],10);
+      var mon = parseInt(dmyMatch[2],10);
+      var yr  = parseInt(dmyMatch[3],10);
+      // Ambiguous — assume DD/MM/YYYY if day ≤ 12 and mon ≤ 12
+      // We'll trust the user's format; if year < 100 adjust
+      if (yr < 100) yr += 2000;
+      d = new Date(yr, mon - 1, day);
+    }
+    if (isNaN(d.getTime())) return str; // return raw if unparseable
+    var dd  = String(d.getDate()).padStart(2,'0');
+    var mm  = String(d.getMonth()+1).padStart(2,'0');
+    var yy  = d.getFullYear();
+    return dd + '/' + mm + '/' + yy;
+  }
+
+  /* ── Build species index ────────────────────────────────────── */
+  function buildIndex(data) {
+    speciesIndex = {};
+    data.forEach(function (r) {
+      var key = r.common + '|||' + r.sci;
+      if (!speciesIndex[key]) {
+        speciesIndex[key] = { common: r.common, sci: r.sci, rows: [] };
+      }
+      speciesIndex[key].rows.push(r);
+    });
+  }
+
+  /* ── 30-day site count ──────────────────────────────────────── */
+  function recentSiteCount(rows) {
+    var cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    var sites = {};
+    rows.forEach(function (r) {
+      // Parse back from DD/MM/YYYY
+      var parts = r.date.split('/');
+      if (parts.length === 3) {
+        var d = new Date(parseInt(parts[2],10), parseInt(parts[1],10)-1, parseInt(parts[0],10));
+        if (!isNaN(d.getTime()) && d >= cutoff) {
+          sites[r.site || (r.lat+','+r.lon)] = true;
+        }
+      }
+    });
+    return Object.keys(sites).length;
+  }
+
+  /* ── Render markers for a species ──────────────────────────── */
+  function renderSpecies(key) {
+    markerLayer.clearLayers();
+    if (!key || !speciesIndex[key]) return;
+    activeSpecies = key;
+    var entry = speciesIndex[key];
+
+    entry.rows.forEach(function (r) {
+      var color = r.valid ? '#2e7d32' : '#c8692a';
+      var border = r.valid ? 'rgba(20,80,20,0.3)' : 'rgba(140,60,0,0.3)';
+      var icon = L.divIcon({
+        className: '',
+        html: '<div style="width:14px;height:14px;border-radius:50%;background:'
+              + color + ';border:2.5px solid #fff;outline:2px solid '
+              + border + ';box-shadow:0 2px 6px rgba(0,0,0,0.28);cursor:pointer"></div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+      L.marker([r.lat, r.lon], { icon: icon })
+       .bindPopup(buildPopup(r), { maxWidth: 280 })
+       .addTo(markerLayer);
+    });
+
+    // Fit bounds
+    var lats = entry.rows.map(function(r){return r.lat;});
+    var lons  = entry.rows.map(function(r){return r.lon;});
+    if (entry.rows.length === 1) {
+      leafMap.setView([lats[0], lons[0]], 12);
+    } else {
+      leafMap.fitBounds([
+        [Math.min.apply(null,lats), Math.min.apply(null,lons)],
+        [Math.max.apply(null,lats), Math.max.apply(null,lons)]
+      ], { padding: [50, 50] });
+    }
+
+    // Update ticker
+    var cnt = recentSiteCount(entry.rows);
+    document.getElementById('n-ticker-count').textContent = cnt;
+    document.getElementById('n-ticker').style.display = 'block';
+  }
+
+  /* ── Build popup ────────────────────────────────────────────── */
+  function buildPopup(r) {
+    var statusClass = r.valid ? 'confirmed' : 'unconfirmed';
+    var statusLabel = r.valid ? '● Confirmed' : '● Unconfirmed';
+    return '<div class="n-popup">'
+      + '<div class="n-popup-site">' + esc(r.site || 'Unknown site') + '</div>'
+      + '<div class="n-popup-body">'
+      + '<div class="n-popup-common">' + esc(r.common) + '</div>'
+      + '<div class="n-popup-sci">' + esc(r.sci) + '</div>'
+      + (r.date ? '<div class="n-popup-row"><span class="n-popup-key">Last seen</span><span class="n-popup-val">' + esc(r.date) + '</span></div>' : '')
+      + '<div class="n-popup-row" style="margin-top:8px">'
+      + '<span class="n-popup-badge ' + statusClass + '">' + statusLabel + '</span>'
+      + '</div>'
+      + '</div></div>';
+  }
+
+  /* ── Autocomplete ───────────────────────────────────────────── */
+  var searchInput = document.getElementById('n-search-input');
+  var dropdown    = document.getElementById('n-dropdown');
+  var clearBtn    = document.getElementById('n-clear-btn');
+
+  function getSpeciesList() {
+    return Object.keys(speciesIndex).map(function(k){
+      return speciesIndex[k];
+    }).sort(function(a,b){ return a.common.localeCompare(b.common); });
+  }
+
+  function highlight(text, query) {
+    if (!query) return esc(text);
+    var re = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi');
+    return esc(text).replace(re, '<mark>$1</mark>');
+  }
+
+  function showDropdown(query) {
+    var q = query.trim().toLowerCase();
+    if (!q) { hideDropdown(); return; }
+
+    var all = getSpeciesList();
+    var matches = all.filter(function(s){
+      return s.common.toLowerCase().indexOf(q) > -1
+          || s.sci.toLowerCase().indexOf(q) > -1;
+    }).slice(0, 40);
+
+    dropdown.innerHTML = '';
+    ddFocusIdx = -1;
+
+    if (matches.length === 0) {
+      dropdown.innerHTML = '<div class="n-dd-none">No species found matching "' + esc(query) + '"</div>';
+      dropdown.style.display = 'block';
+      ddItems = [];
+      return;
+    }
+
+    ddItems = matches;
+    matches.forEach(function(s, i) {
+      var div = document.createElement('div');
+      div.className = 'n-dd-item';
+      div.innerHTML = '<span class="n-dd-common">' + highlight(s.common, query) + '</span>'
+                    + '<span class="n-dd-sci">' + highlight(s.sci, query) + '</span>';
+      div.addEventListener('mousedown', function(e){
+        e.preventDefault(); // prevent blur
+        selectSpecies(s);
+      });
+      dropdown.appendChild(div);
+    });
+
+    dropdown.style.display = 'block';
+  }
+
+  function hideDropdown() {
+    dropdown.style.display = 'none';
+    ddItems = [];
+    ddFocusIdx = -1;
+  }
+
+  function selectSpecies(s) {
+    searchInput.value = s.common + ' — ' + s.sci;
+    hideDropdown();
+    clearBtn.style.display = 'block';
+    var key = s.common + '|||' + s.sci;
+    renderSpecies(key);
+  }
+
+  searchInput.addEventListener('input', function(){
+    clearBtn.style.display = this.value ? 'block' : 'none';
+    showDropdown(this.value);
+  });
+
+  searchInput.addEventListener('keydown', function(e){
+    var items = dropdown.querySelectorAll('.n-dd-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      ddFocusIdx = Math.min(ddFocusIdx + 1, items.length - 1);
+      items.forEach(function(el,i){ el.classList.toggle('focused', i === ddFocusIdx); });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      ddFocusIdx = Math.max(ddFocusIdx - 1, 0);
+      items.forEach(function(el,i){ el.classList.toggle('focused', i === ddFocusIdx); });
+    } else if (e.key === 'Enter' && ddFocusIdx > -1) {
+      e.preventDefault();
+      selectSpecies(ddItems[ddFocusIdx]);
+    } else if (e.key === 'Escape') {
+      hideDropdown();
+    }
+  });
+
+  searchInput.addEventListener('blur', function(){ setTimeout(hideDropdown, 150); });
+
+  clearBtn.addEventListener('click', function(){
+    searchInput.value = '';
+    clearBtn.style.display = 'none';
+    hideDropdown();
+    markerLayer.clearLayers();
+    activeSpecies = null;
+    document.getElementById('n-ticker').style.display = 'none';
+    leafMap.setView([52.78, 1.00], 9);
+  });
+
+  /* ── Escape HTML ────────────────────────────────────────────── */
+  function esc(s) {
+    return String(s||'')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ── Data loading ───────────────────────────────────────────── */
+  function onData(csvText) {
+    allData = parseCSV(csvText);
+    buildIndex(allData);
+  }
+
+  function loadData() {
+    if (typeof CSV_URL === 'undefined' || !CSV_URL) {
+      onData(SAMPLE_CSV);
+      return;
+    }
+    fetch(CSV_URL)
+      .then(function(r){ return r.text(); })
+      .then(onData)
+      .catch(function(err){
+        console.warn('Species map: could not load CSV from', CSV_URL, err);
+        onData(SAMPLE_CSV); // fallback to sample
+      });
+  }
+
+  /* ── Boot ───────────────────────────────────────────────────── */
+  initMap();
+  loadData();
+
+})();
+</script>
