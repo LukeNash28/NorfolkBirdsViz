@@ -3,23 +3,14 @@
 ║  NORFOLK SPECIES OBSERVATION MAP                                  ║
 ║  WordPress-embeddable widget                                      ║
 ║                                                                   ║
-║  DEPLOY ON WORDPRESS:                                             ║
+║  DEPLOYMENT INSTRUCTIONS (WORDPRESS):                             ║
 ║  • Gutenberg "Custom HTML" block  — paste entire file contents    ║
 ║  • WPCode / Insert Headers & Footers plugin — paste in footer     ║
 ║  • <iframe src="hosted-file-url" width="100%" height="660">       ║
 ║                                                                   ║
 ║  DATA SOURCE:                                                     ║
-║  Set CSV_URL below to the public URL of your hosted CSV file.     ║
-║  The CSV will be fetched fresh on every page load.                ║
-║                                                                   ║
-║  REQUIRED CSV COLUMNS (names are flexible / case-insensitive):   ║
-║    common_name   — or common, name                                ║
-║    scientific_name — or scientific, latin                         ║
-║    site_name     — or site, location                              ║
-║    date          — or last_seen, observed_on  (any parseable fmt) ║
-║    latitude      — or lat                                         ║
-║    longitude     — or lon, lng, long                              ║
-║    validity      — or valid, confirmed  (TRUE / FALSE)            ║
+║  Publicly-available dataset, updated daily by CRON job            ║
+║  Link defined in var CSV_URL.                                     ║
 ╚═══════════════════════════════════════════════════════════════════╝
 -->
 
@@ -32,9 +23,8 @@
      CONFIGURATION — edit this block only
      ══════════════════════════════════════════════════════════════ -->
 <script>
-  // ▼ Point this at your hosted CSV URL
-  var CSV_URL = '';   // e.g. 'https://raw.githubusercontent.com/you/repo/main/data.csv'
-                      // Leave empty to use the built-in sample data below
+  // 
+  var CSV_URL = 'https://raw.githubusercontent.com/LukeNash28/NorfolkBirdsViz/main/All%20Obs%201103.csv';
 </script>
 <!-- ══════════════════════════════════════════════════════════════ -->
 
@@ -433,7 +423,6 @@
       <button class="n-clear-btn" id="n-clear-btn" title="Clear">✕</button>
       <div class="n-dropdown" id="n-dropdown"></div>
     </div>
-    <span class="n-hint">Type to search — select a species to show its sites</span>
   </div>
 
   <!-- Map body -->
@@ -544,13 +533,13 @@
       return -1;
     }
 
-    var cni  = ci(['common_name','common','name']);
-    var sci  = ci(['scientific_name','scientific','latin','sci_name']);
-    var sni  = ci(['site_name','site','location','place']);
-    var di   = ci(['date','last_seen','observed_on','obs_date']);
-    var lati = ci(['latitude','lat']);
-    var loni = ci(['longitude','lon','lng','long']);
-    var vi   = ci(['validity','valid','confirmed','status']);
+    var cni  = ci(['comname']);
+    var sci  = ci(['sciname']);
+    var sni  = ci(['sitename']);
+    var di   = ci(['obsdt']);
+    var lati = ci(['sitelat', 'lat']);
+    var loni = ci(['sitelng','lon','lng']);
+    var vi   = ci(['obsvalid']);
 
     var rows = [];
     for (var i = 1; i < lines.length; i++) {

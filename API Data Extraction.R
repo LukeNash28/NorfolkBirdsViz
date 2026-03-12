@@ -3,6 +3,8 @@ require(dplyr)
 require(rebird)
 require(geosphere)
 require(pbapply)
+require(dbscan)
+require(tidygeocoder)
 
 setwd('/Users/lnash1/Documents/Birds of Norfolk')
 rm = list(ls())
@@ -44,7 +46,8 @@ ukNames <- ebirdtaxonomy(locale = "en_UK") |>
 spAll <- ebirdregion("GB-ENG-NFK", provisional = T, back=30) |>
   
   #Rolling observations at subspecies level into parent species
-  left_join(ebirdtaxonomy() |> select(speciesCode, reportAs, category), by = "speciesCode") |>
+  left_join(ebirdtaxonomy() |> select(speciesCode, reportAs, category), 
+            by = "speciesCode") |>
   mutate(speciesCode = ifelse(
     category == "subspecies" & !is.na(reportAs),
     reportAs,
@@ -63,9 +66,6 @@ spAll <- ebirdregion("GB-ENG-NFK", provisional = T, back=30) |>
 
 #Compute data frame of most recent observations of all species across all sites
 #in Norfolk.
-
-temp <- ebirdregion("GB-ENG-NFK", spAll[1], provisional = T, back=30)
-
 obsAll <- pblapply(spAll, function(sp){
   ebirdregion("GB-ENG-NFK",sp, provisional = T, back=30) |>
     
@@ -73,7 +73,7 @@ obsAll <- pblapply(spAll, function(sp){
     select(-comName) |>
     left_join(ukNames, by = "speciesCode") |>
     
-    #Group all non-hotspot checklists to nearest hotspot within 2km
+    #Group all non-hotspot checklists to nearest hotspot within 1km
     select(comName, sciName, locId, locName, obsDt, obsValid, lat, lng) |>
     
     rowwise() |>
@@ -81,30 +81,60 @@ obsAll <- pblapply(spAll, function(sp){
       locId %in% locsAll$locId,
       locsAll$siteName[match(locId, locsAll$locId)],
       ifelse(
-        min(distHaversine(c(lng, lat), cbind(locsAll$locLng, locsAll$locLat))) <= 2000,
-        locsAll$siteName[which.min(distHaversine(c(lng, lat), cbind(locsAll$locLng, locsAll$locLat)))],
+        min(
+          distHaversine(
+            c(lng, lat), cbind(locsAll$locLng, locsAll$locLat)
+            )
+          ) <= 1000,
+        locsAll$siteName[which.min(
+          distHaversine(
+            c(lng, lat), cbind(locsAll$locLng, locsAll$locLat)
+            )
+          )],
         NA_character_
       )
-    )) |>
-    ungroup() |>
+    ),
     
-    #Get site co-ordinates from locsAll, else leave unchanged
-    mutate(
       siteLat = ifelse(
         locId %in% locsAll$locId,
         locsAll$siteLat[match(locId, locsAll$locId)],
-        lat
+        ifelse(
+          min(
+            distHaversine(
+              c(lng, lat), cbind(locsAll$locLng, locsAll$locLat)
+            )
+          ) <= 1000,
+          locsAll$siteLat[which.min(
+            distHaversine(
+              c(lng, lat), cbind(locsAll$locLng, locsAll$locLat)
+            )
+          )],
+          lat
+        )
       ),
       
       siteLng = ifelse(
         locId %in% locsAll$locId,
         locsAll$siteLng[match(locId, locsAll$locId)],
-        lng
-      )
-    ) |>
-    select(-c(locId, locName, lat, lng)) |>
-    filter(!is.na(siteName))
+        ifelse(
+          min(
+            distHaversine(
+              c(lng, lat), cbind(locsAll$locLng, locsAll$locLat)
+            )
+          ) <= 1000,
+          locsAll$siteLng[which.min(
+            distHaversine(
+              c(lng, lat), cbind(locsAll$locLng, locsAll$locLat)
+            )
+          )],
+          lng
+        )
+      ))|>
+    ungroup() |>
+    select(-c(locId, lat, lng))
 }) |>
   bind_rows()
 
 write.csv(obsAll, paste0("All Obs ", format(Sys.Date(), "%d%m"), ".csv"), row.names = F)
+
+##GENERATE SITE NAMES FOR ALL CHECKLISTS > 1KM FROM ANY HOTSPOT
