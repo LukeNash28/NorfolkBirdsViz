@@ -7,7 +7,7 @@ require(dbscan)
 require(tidygeocoder)
 
 setwd('/Users/lnash1/Documents/Birds of Norfolk')
-rm = list(ls())
+rm(list = ls())
 
 #Group all hotspots by site and get aggregated co-ordinates
 locsAll <- ebirdhotspotlist("GB-ENG-NFK") |>
@@ -95,7 +95,7 @@ obsAll <- pblapply(spAll, function(sp){
       )
     ),
     
-      siteLat = ifelse(
+      locLat = ifelse(
         locId %in% locsAll$locId,
         locsAll$siteLat[match(locId, locsAll$locId)],
         ifelse(
@@ -113,7 +113,7 @@ obsAll <- pblapply(spAll, function(sp){
         )
       ),
       
-      siteLng = ifelse(
+      locLng = ifelse(
         locId %in% locsAll$locId,
         locsAll$siteLng[match(locId, locsAll$locId)],
         ifelse(
@@ -135,6 +135,49 @@ obsAll <- pblapply(spAll, function(sp){
 }) |>
   bind_rows()
 
-write.csv(obsAll, paste0("All Obs ", format(Sys.Date(), "%d%m"), ".csv"), row.names = F)
-
 ##GENERATE SITE NAMES FOR ALL CHECKLISTS > 1KM FROM ANY HOTSPOT
+noSite <- obsAll |> filter(is.na(siteName))
+
+#Cluster checklist co-ordinates and get centroids
+coords <- noSite |> 
+  distinct(locLat, locLng) |> 
+  select(locLat, locLng) |> 
+  as.matrix()
+
+clusters <- dbscan(coords, eps = 0.018, minPts = 2)
+coords <- as.data.frame(cbind(coords, cluster = c(clusters$cluster)))
+
+centroids <- coords |>
+  filter(cluster != 0) |>
+  group_by(cluster) |>
+  summarise(
+    siteLat = mean(locLat),
+    siteLng = mean(locLng)
+  )
+
+#Assign site names to clusters using reverse geocoding
+clusterNames <- centroids |>
+  reverse_geocode(lat = siteLat, long = siteLng, method = "osm", 
+                  full_results = T) |>
+  mutate(clusterName = coalesce(hamlet, village, suburb, town,
+                             paste0(round(siteLat,4), ", ",
+                             round(siteLng, 4)))) |>
+  select(cluster, siteLat, siteLng, clusterName)
+
+coords <- coords |>
+  left_join(clusterNames, by = "cluster") |>
+  select(-cluster)
+
+#Map cluster names to observations
+noSite <- noSite |>
+  left_join(coords, by = c("locLat", "locLng")) |>
+  mutate(siteName = coalesce(clusterName, siteName),
+         locLat = coalesce(siteLat, locLat),
+         locLng = coalesce(siteLng, locLng)) |>
+  select(-c(siteLat, siteLng, clusterName))
+
+obsAll <- bind_rows(noSite, obsAll[!is.na(obsAll$siteName), ]) |>
+  filter(!is.na(siteName))
+
+write.csv(obsAll, "All Observations.csv", row.names = F)
+
