@@ -20,11 +20,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400;1,600&family=Nunito+Sans:wght@300;400;600&display=swap" rel="stylesheet">
 
 <!-- ══════════════════════════════════════════════════════════════
-     CONFIGURATION — edit this block only
+     CONFIGURATION
      ══════════════════════════════════════════════════════════════ -->
 <script>
-  // 
-  var CSV_URL = 'https://raw.githubusercontent.com/LukeNash28/NorfolkBirdsViz/refs/heads/main/All%20Obs%201203.csv';
+  var CSV_URL = 'https://raw.githubusercontent.com/LukeNash28/NorfolkBirdsViz/main/All%20Observations.csv'; 
 </script>
 <!-- ══════════════════════════════════════════════════════════════ -->
 
@@ -91,6 +90,9 @@
   font-weight: 400;
   color: #b8d4a8;
   font-size: 0.9em;
+  margin-left: 12px;
+  border-left: 1px solid #b8d4a8;
+  padding-left: 12px;
 }
 
 #nsom .n-ticker {
@@ -181,7 +183,7 @@
 #nsom .n-clear-btn:hover { color: var(--text); }
 
 #nsom .n-hint {
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   color: var(--text-lt);
   font-style: italic;
   margin-left: 4px;
@@ -311,8 +313,8 @@
   width: auto !important;
 }
 
-#nsom .leaflet-popup-tip-container { margin-top: -1px; }
-#nsom .leaflet-popup-tip { background: var(--parchment); }
+#nsom .leaflet-popup-tip-container { display:none; }
+#nsom .leaflet-popup-tip { display:none; }
 #nsom .leaflet-popup-close-button { color: var(--text-lt) !important; top: 8px !important; right: 8px !important; }
 
 #nsom .n-popup {
@@ -404,7 +406,7 @@
 
   <!-- Header -->
   <div class="n-hd">
-    <div class="n-title">Norfolk Species Observations <span>— interactive map</span></div>
+    <div class="n-title">Birds of Norfolk <span>Recent Observations</span></div>
     <div class="n-ticker" id="n-ticker" style="display:none">
       <strong id="n-ticker-count">0</strong> sites recording this species in the last 30 days
     </div>
@@ -423,6 +425,7 @@
       <button class="n-clear-btn" id="n-clear-btn" title="Clear">✕</button>
       <div class="n-dropdown" id="n-dropdown"></div>
     </div>
+    <span class="n-hint">Data refreshed every day at 00:00</span>
   </div>
 
   <!-- Map body -->
@@ -439,9 +442,6 @@
     <span class="n-leg-item">
       <span class="n-leg-dot" style="background:#c8692a"></span> Unconfirmed
     </span>
-    <span style="margin-left:auto;font-size:.65rem;opacity:.6;text-transform:none;letter-spacing:0">
-      Data refreshed on page load · Search by common or scientific name
-    </span>
   </div>
 
 </div>
@@ -452,47 +452,9 @@
 (function () {
   'use strict';
 
-  /* ── SAMPLE DATA (used when CSV_URL is empty) ──────────────────
-     Replace with your real hosted CSV URL in the config block above.
-     Column names match the flexible parser below.
-  ─────────────────────────────────────────────────────────────── */
-  var SAMPLE_CSV = [
-    'common_name,scientific_name,site_name,date,latitude,longitude,validity',
-    'Marsh Harrier,Circus aeruginosus,Hickling Broad NNR,2025-02-28,52.7408,1.5678,TRUE',
-    'Marsh Harrier,Circus aeruginosus,Cley Marshes,2025-03-05,52.9571,1.0479,TRUE',
-    'Marsh Harrier,Circus aeruginosus,Titchwell Marsh,2025-03-01,52.9741,0.6013,TRUE',
-    'Bittern,Botaurus stellaris,Hickling Broad NNR,2025-03-08,52.7408,1.5678,TRUE',
-    'Bittern,Botaurus stellaris,Strumpshaw Fen,2025-02-20,52.6134,1.4437,TRUE',
-    'Bittern,Botaurus stellaris,Barton Broad,2025-01-15,52.7280,1.5210,FALSE',
-    'Avocet,Recurvirostra avosetta,Titchwell Marsh,2025-03-09,52.9741,0.6013,TRUE',
-    'Avocet,Recurvirostra avosetta,Cley Marshes,2025-03-07,52.9571,1.0479,TRUE',
-    'Avocet,Recurvirostra avosetta,Breydon Water,2025-02-10,52.6078,1.6801,TRUE',
-    'Pink-footed Goose,Anser brachyrhynchus,Holkham NNR,2025-03-04,52.9700,0.8200,TRUE',
-    'Pink-footed Goose,Anser brachyrhynchus,Ken Hill Marshes,2025-02-28,52.8700,0.5100,TRUE',
-    'Bearded Tit,Panurus biarmicus,Hickling Broad NNR,2025-03-06,52.7408,1.5678,TRUE',
-    'Bearded Tit,Panurus biarmicus,Cley Marshes,2025-02-22,52.9571,1.0479,TRUE',
-    'Common Crane,Grus grus,Hickling Broad NNR,2025-03-10,52.7408,1.5678,TRUE',
-    'Common Crane,Grus grus,Strumpshaw Fen,2025-02-18,52.6134,1.4437,FALSE',
-    'Barn Owl,Tyto alba,Welney WWT,2025-03-02,52.5120,0.2640,TRUE',
-    'Barn Owl,Tyto alba,Holkham NNR,2025-01-30,52.9700,0.8200,FALSE',
-    'Water Rail,Rallus aquaticus,Cley Marshes,2025-03-05,52.9571,1.0479,TRUE',
-    'Water Rail,Rallus aquaticus,Titchwell Marsh,2025-02-25,52.9741,0.6013,TRUE',
-    'Eurasian Spoonbill,Platalea leucorodia,Titchwell Marsh,2025-03-09,52.9741,0.6013,TRUE',
-    'Eurasian Spoonbill,Platalea leucorodia,Brancaster Staithe,2025-03-03,52.9620,0.6400,FALSE',
-    'Little Egret,Egretta garzetta,Breydon Water,2025-03-08,52.6078,1.6801,TRUE',
-    'Little Egret,Egretta garzetta,Cley Marshes,2025-03-01,52.9571,1.0479,TRUE',
-    'Swallowtail Butterfly,Papilio machaon britannicus,Hickling Broad NNR,2025-02-28,52.7408,1.5678,FALSE',
-    'Otter,Lutra lutra,Strumpshaw Fen,2025-03-06,52.6134,1.4437,TRUE',
-    'Otter,Lutra lutra,River Bure at Horning,2025-02-14,52.7200,1.4800,TRUE',
-    'Chinese Water Deer,Hydropotes inermis,Holkham NNR,2025-03-07,52.9700,0.8200,TRUE',
-    'Natterjack Toad,Epidalea calamita,Holkham NNR,2025-01-20,52.9700,0.8200,FALSE',
-    'Grey Seal,Halichoerus grypus,Blakeney Point,2025-03-09,52.9999,0.9741,TRUE',
-    'Grey Seal,Halichoerus grypus,Horsey Beach,2025-03-07,52.7500,1.6500,TRUE',
-  ].join('\n');
-
   /* ── State ─────────────────────────────────────────────────── */
   var allData      = [];
-  var speciesIndex = {};   // key: "common|||sci" → array of rows
+  var speciesIndex = {};
   var leafMap      = null;
   var markerLayer  = null;
   var activeSpecies = null;
@@ -504,10 +466,11 @@
     leafMap = L.map('nsom-map', { zoomControl: true })
                .setView([52.78, 1.00], 9);
 
-    // OpenTopoMap — topographic tile layer
-    L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA) · © <a href="https://openstreetmap.org">OSM</a>',
-      maxZoom: 17
+    // CartoDB Positron — clean, minimal base layer
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19
     }).addTo(leafMap);
 
     markerLayer = L.layerGroup().addTo(leafMap);
@@ -518,12 +481,13 @@
     var lines = txt.trim().split(/\r?\n/);
     if (lines.length < 2) return [];
 
-    // Detect delimiter
     var d = ',';
     if (lines[0].indexOf('\t') > -1 && lines[0].indexOf(',') === -1) d = '\t';
     else if (lines[0].indexOf(';') > -1 && lines[0].indexOf(',') === -1) d = ';';
 
-    var hdrs = splitLine(lines[0], d).map(function (h) { return h.toLowerCase().trim().replace(/['"]/g,''); });
+    var hdrs = splitLine(lines[0], d).map(function (h) {
+      return h.toLowerCase().trim().replace(/['"]/g, '');
+    });
 
     function ci(aliases) {
       for (var i = 0; i < aliases.length; i++) {
@@ -533,13 +497,14 @@
       return -1;
     }
 
-    var cni  = ci(['comname']);
-    var sci  = ci(['sciname']);
-    var sni  = ci(['sitename']);
-    var di   = ci(['obsdt']);
-    var lati = ci(['sitelat', 'lat']);
-    var loni = ci(['sitelng','lon','lng']);
-    var vi   = ci(['obsvalid']);
+    // ── Column name aliases — update left-hand values to match your CSV headers ──
+    var cni  = ci(['comname']);        // common name
+    var sci  = ci(['sciname']);        // scientific name
+    var sni  = ci(['sitename']);       // site name
+    var di   = ci(['obsdt']);          // observation date
+    var lati = ci(['loclat']);        // latitude
+    var loni = ci(['loclng']);        // longitude
+    var vi   = ci(['obsvalid']);       // validity (TRUE/FALSE)
 
     var rows = [];
     for (var i = 1; i < lines.length; i++) {
@@ -556,7 +521,7 @@
       rows.push({
         common:   commonName,
         sci:      sciName,
-        site:     sni  > -1 ? clean(c[sni]) : '',
+        site:     sni > -1 ? clean(c[sni]) : '',
         date:     formatDate(rawDate),
         lat:      lat,
         lon:      lon,
@@ -586,23 +551,19 @@
   /* ── Date formatter → DD/MM/YYYY ───────────────────────────── */
   function formatDate(str) {
     if (!str) return '';
-    // Try parsing various formats
     var d = new Date(str);
-    // Also handle DD/MM/YYYY input explicitly
     var dmyMatch = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
     if (dmyMatch) {
-      var day = parseInt(dmyMatch[1],10);
-      var mon = parseInt(dmyMatch[2],10);
-      var yr  = parseInt(dmyMatch[3],10);
-      // Ambiguous — assume DD/MM/YYYY if day ≤ 12 and mon ≤ 12
-      // We'll trust the user's format; if year < 100 adjust
+      var day = parseInt(dmyMatch[1], 10);
+      var mon = parseInt(dmyMatch[2], 10);
+      var yr  = parseInt(dmyMatch[3], 10);
       if (yr < 100) yr += 2000;
       d = new Date(yr, mon - 1, day);
     }
-    if (isNaN(d.getTime())) return str; // return raw if unparseable
-    var dd  = String(d.getDate()).padStart(2,'0');
-    var mm  = String(d.getMonth()+1).padStart(2,'0');
-    var yy  = d.getFullYear();
+    if (isNaN(d.getTime())) return str;
+    var dd = String(d.getDate()).padStart(2, '0');
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var yy = d.getFullYear();
     return dd + '/' + mm + '/' + yy;
   }
 
@@ -624,12 +585,11 @@
     cutoff.setDate(cutoff.getDate() - 30);
     var sites = {};
     rows.forEach(function (r) {
-      // Parse back from DD/MM/YYYY
       var parts = r.date.split('/');
       if (parts.length === 3) {
-        var d = new Date(parseInt(parts[2],10), parseInt(parts[1],10)-1, parseInt(parts[0],10));
+        var d = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
         if (!isNaN(d.getTime()) && d >= cutoff) {
-          sites[r.site || (r.lat+','+r.lon)] = true;
+          sites[r.site || (r.lat + ',' + r.lon)] = true;
         }
       }
     });
@@ -644,30 +604,40 @@
     var entry = speciesIndex[key];
 
     entry.rows.forEach(function (r) {
-      var color = r.valid ? '#2e7d32' : '#c8692a';
+      var color  = r.valid ? '#2e7d32' : '#c8692a';
       var border = r.valid ? 'rgba(20,80,20,0.3)' : 'rgba(140,60,0,0.3)';
+
       var icon = L.divIcon({
         className: '',
         html: '<div style="width:14px;height:14px;border-radius:50%;background:'
               + color + ';border:2.5px solid #fff;outline:2px solid '
-              + border + ';box-shadow:0 2px 6px rgba(0,0,0,0.28);cursor:pointer"></div>',
+              + border + ';box-shadow:0 2px 6px rgba(0,0,0,0.28);cursor:pointer;transition:transform 0.15s ease;"></div>',
         iconSize: [14, 14],
         iconAnchor: [7, 7]
       });
-      L.marker([r.lat, r.lon], { icon: icon })
-       .bindPopup(buildPopup(r), { maxWidth: 280 })
-       .addTo(markerLayer);
+
+      var m = L.marker([r.lat, r.lon], { icon: icon })
+               .bindPopup(buildPopup(r), { maxWidth: 280 })
+               .addTo(markerLayer);
+
+      // Grow effect on click
+      m.on('click', function () {
+        var markerEl = m.getElement().querySelector('div');
+        markerEl.style.transform = 'scale(1.7)';
+        markerEl.style.transition = 'transform 0.15s ease';
+        setTimeout(function () { markerEl.style.transform = 'scale(1)'; }, 400);
+      });
     });
 
     // Fit bounds
-    var lats = entry.rows.map(function(r){return r.lat;});
-    var lons  = entry.rows.map(function(r){return r.lon;});
+    var lats = entry.rows.map(function (r) { return r.lat; });
+    var lons  = entry.rows.map(function (r) { return r.lon; });
     if (entry.rows.length === 1) {
       leafMap.setView([lats[0], lons[0]], 12);
     } else {
       leafMap.fitBounds([
-        [Math.min.apply(null,lats), Math.min.apply(null,lons)],
-        [Math.max.apply(null,lats), Math.max.apply(null,lons)]
+        [Math.min.apply(null, lats), Math.min.apply(null, lons)],
+        [Math.max.apply(null, lats), Math.max.apply(null, lons)]
       ], { padding: [50, 50] });
     }
 
@@ -699,14 +669,14 @@
   var clearBtn    = document.getElementById('n-clear-btn');
 
   function getSpeciesList() {
-    return Object.keys(speciesIndex).map(function(k){
+    return Object.keys(speciesIndex).map(function (k) {
       return speciesIndex[k];
-    }).sort(function(a,b){ return a.common.localeCompare(b.common); });
+    }).sort(function (a, b) { return a.common.localeCompare(b.common); });
   }
 
   function highlight(text, query) {
     if (!query) return esc(text);
-    var re = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi');
+    var re = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
     return esc(text).replace(re, '<mark>$1</mark>');
   }
 
@@ -715,7 +685,7 @@
     if (!q) { hideDropdown(); return; }
 
     var all = getSpeciesList();
-    var matches = all.filter(function(s){
+    var matches = all.filter(function (s) {
       return s.common.toLowerCase().indexOf(q) > -1
           || s.sci.toLowerCase().indexOf(q) > -1;
     }).slice(0, 40);
@@ -731,13 +701,13 @@
     }
 
     ddItems = matches;
-    matches.forEach(function(s, i) {
+    matches.forEach(function (s, i) {
       var div = document.createElement('div');
       div.className = 'n-dd-item';
       div.innerHTML = '<span class="n-dd-common">' + highlight(s.common, query) + '</span>'
                     + '<span class="n-dd-sci">' + highlight(s.sci, query) + '</span>';
-      div.addEventListener('mousedown', function(e){
-        e.preventDefault(); // prevent blur
+      div.addEventListener('mousedown', function (e) {
+        e.preventDefault();
         selectSpecies(s);
       });
       dropdown.appendChild(div);
@@ -760,22 +730,22 @@
     renderSpecies(key);
   }
 
-  searchInput.addEventListener('input', function(){
+  searchInput.addEventListener('input', function () {
     clearBtn.style.display = this.value ? 'block' : 'none';
     showDropdown(this.value);
   });
 
-  searchInput.addEventListener('keydown', function(e){
+  searchInput.addEventListener('keydown', function (e) {
     var items = dropdown.querySelectorAll('.n-dd-item');
     if (!items.length) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       ddFocusIdx = Math.min(ddFocusIdx + 1, items.length - 1);
-      items.forEach(function(el,i){ el.classList.toggle('focused', i === ddFocusIdx); });
+      items.forEach(function (el, i) { el.classList.toggle('focused', i === ddFocusIdx); });
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       ddFocusIdx = Math.max(ddFocusIdx - 1, 0);
-      items.forEach(function(el,i){ el.classList.toggle('focused', i === ddFocusIdx); });
+      items.forEach(function (el, i) { el.classList.toggle('focused', i === ddFocusIdx); });
     } else if (e.key === 'Enter' && ddFocusIdx > -1) {
       e.preventDefault();
       selectSpecies(ddItems[ddFocusIdx]);
@@ -784,9 +754,9 @@
     }
   });
 
-  searchInput.addEventListener('blur', function(){ setTimeout(hideDropdown, 150); });
+  searchInput.addEventListener('blur', function () { setTimeout(hideDropdown, 150); });
 
-  clearBtn.addEventListener('click', function(){
+  clearBtn.addEventListener('click', function () {
     searchInput.value = '';
     clearBtn.style.display = 'none';
     hideDropdown();
@@ -798,9 +768,9 @@
 
   /* ── Escape HTML ────────────────────────────────────────────── */
   function esc(s) {
-    return String(s||'')
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(s || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   /* ── Data loading ───────────────────────────────────────────── */
@@ -815,11 +785,11 @@
       return;
     }
     fetch(CSV_URL)
-      .then(function(r){ return r.text(); })
+      .then(function (r) { return r.text(); })
       .then(onData)
-      .catch(function(err){
+      .catch(function (err) {
         console.warn('Species map: could not load CSV from', CSV_URL, err);
-        onData(SAMPLE_CSV); // fallback to sample
+        onData(SAMPLE_CSV);
       });
   }
 
