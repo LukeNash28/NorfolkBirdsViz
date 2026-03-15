@@ -1,7 +1,4 @@
 #Setting up environment
-install.packages(c("dplyr", "rebird", "geosphere", "pbapply", "dbscan", "tidygeocoder"), 
-                 repos = "https://cloud.r-project.org")
-
 require(dplyr)
 require(rebird)
 require(geosphere)
