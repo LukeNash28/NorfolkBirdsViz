@@ -6,7 +6,7 @@ require(pbapply)
 require(dbscan)
 require(tidygeocoder)
 
-setwd('/Users/lnash1/Documents/Birds of Norfolk')
+setwd('/Users/lnash1/Documents/Birds of Norfolk/Web Dev')
 rm(list = ls())
 
 #Helper function to get site names for all checklists > 1km from any hotspot
