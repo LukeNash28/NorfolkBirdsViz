@@ -183,6 +183,5 @@ obsAll <- pblapply(spAll, function(sp){
   bind_rows() |>
   fixNames()
 
-##GENERATE SITE NAMES FOR ALL CHECKLISTS > 1KM FROM ANY HOTSPOT
-write.csv(obsAll, "/Users/lnash1/Documents/Birds of Norfolk/Web Dev/All Observations.csv", row.names = F)
+write.csv(obsAll, "All Observations.csv", row.names = F)
 
