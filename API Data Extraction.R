@@ -1,4 +1,7 @@
 #Setting up environment
+install.packages(c("dplyr", "rebird", "geosphere", "pbapply", "dbscan", "tidygeocoder"), 
+                 repos = "https://cloud.r-project.org")
+
 require(dplyr)
 require(rebird)
 require(geosphere)
@@ -6,7 +9,6 @@ require(pbapply)
 require(dbscan)
 require(tidygeocoder)
 
-setwd('/Users/lnash1/Documents/Birds of Norfolk/Web Dev')
 rm(list = ls())
 
 #Helper function to get site names for all checklists > 1km from any hotspot
@@ -185,5 +187,5 @@ obsAll <- pblapply(spAll, function(sp){
   fixNames()
 
 ##GENERATE SITE NAMES FOR ALL CHECKLISTS > 1KM FROM ANY HOTSPOT
-write.csv(obsAll, "All Observations.csv", row.names = F)
+write.csv(obsAll, "/Users/lnash1/Documents/Birds of Norfolk/Web Dev/All Observations.csv", row.names = F)
 
