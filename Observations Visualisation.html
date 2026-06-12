@@ -465,6 +465,8 @@
   function initMap() {
     leafMap = L.map('nsom-map', { zoomControl: true })
                .setView([52.78, 1.00], 9);
+    
+    delete L.Icon.Default.prototype._getIconUrl;
 
     // CartoDB Positron — clean, minimal base layer
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {

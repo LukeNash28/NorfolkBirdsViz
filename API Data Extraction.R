@@ -8,6 +8,8 @@ require(tidygeocoder)
 
 rm(list = ls())
 
+usethis::edit_r_environ()
+
 #Helper function to get site names for all checklists > 1km from any hotspot
 fixNames <- function(df){
   noSite <- df |> filter(is.na(siteName))
@@ -111,10 +113,38 @@ spAll <- ebirdregion("GB-ENG-NFK", provisional = T, back=30) |>
            pull(speciesCode))) |>
   pull(speciesCode)
 
+getRegion <- function(..., max_attempts = 5, wait = 0.5){
+  attempt <- 0
+  repeat {
+    result <- tryCatch(
+      ebirdregion(...),
+      error = function(e) {
+        msg <- conditionMessage(e)
+        if(grepl("429|rate|limit|too many|\\$.*atomic|atomic.*\\$", msg, ignore.case = TRUE)) {
+          if(attempt >= max_attempts) stop("Maximum attempts reached: ", msg)
+          message(sprintf("Rate limit hit (attempt %d/%d), waiting %.1fs...", 
+                          attempt + 1, max_attempts, wait * (attempt + 1)))
+          return(structure(list(error = msg, retry = TRUE), class = "rate_limit_error"))
+        }
+        
+        stop(e)
+        
+      }
+    )
+    
+    if(inherits(result, "rate_limit_error")) {
+      attempt <- attempt + 1
+      Sys.sleep(wait * attempt)
+    } else {
+      return(result)
+    }
+  }
+}
+
 #Compute data frame of most recent observations of all species across all sites
 #in Norfolk.
 obsAll <- pblapply(spAll, function(sp){
-  ebirdregion("GB-ENG-NFK",sp, provisional = T, back=30) |>
+  getRegion("GB-ENG-NFK",sp, provisional = T, back=30) |>
     
     #Adjust to English (UK) names
     select(-comName) |>
@@ -179,6 +209,9 @@ obsAll <- pblapply(spAll, function(sp){
       ))|>
     ungroup() |>
     select(-c(locId, lat, lng))
+  
+  Sys.sleep(0.5)
+  
 }) |>
   bind_rows() |>
   fixNames()
