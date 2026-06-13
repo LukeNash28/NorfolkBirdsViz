@@ -6,10 +6,6 @@ require(pbapply)
 require(dbscan)
 require(tidygeocoder)
 
-rm(list = ls())
-
-usethis::edit_r_environ()
-
 #Helper function to get site names for all checklists > 1km from any hotspot
 fixNames <- function(df){
   noSite <- df |> filter(is.na(siteName))
