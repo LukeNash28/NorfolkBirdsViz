@@ -140,6 +140,7 @@ getRegion <- function(..., max_attempts = 5, wait = 0.5){
 #Compute data frame of most recent observations of all species across all sites
 #in Norfolk.
 obsAll <- pblapply(spAll, function(sp){
+  Sys.sleep(0.5)
   getRegion("GB-ENG-NFK",sp, provisional = T, back=30) |>
     
     #Adjust to English (UK) names
@@ -206,11 +207,8 @@ obsAll <- pblapply(spAll, function(sp){
     ungroup() |>
     select(-c(locId, lat, lng))
   
-  Sys.sleep(0.5)
-  
 }) |>
   bind_rows() |>
   fixNames()
 
 write.csv(obsAll, "All Observations.csv", row.names = F)
-
